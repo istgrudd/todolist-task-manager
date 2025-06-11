@@ -73,31 +73,59 @@ class Task:
     def from_dict(cls, data: Dict) -> 'Task':
         """Create Task object from dictionary (CSV data) with validation"""
         try:
+            # Parse completion status
+            selesai = data.get("Selesai", "False").strip().lower() == "true"
+            
+            # Parse and validate completion date if task is marked completed
+            tanggal_selesai = None
+            if selesai and data.get("Tanggal_Selesai", "").strip():
+                try:
+                    tanggal_selesai = datetime.strptime(data["Tanggal_Selesai"].strip(), "%Y-%m-%d").date()
+                except ValueError:
+                    selesai = False  # Auto-correct if date is invalid
+            
+            # If marked completed but no valid date, auto-correct to not completed
+            if selesai and not tanggal_selesai:
+                selesai = False
+            
+            # Create task instance
             task = cls(
-                nama=data["Nama"],
-                deskripsi=data.get("Deskripsi", ""),
-                prioritas=data["Prioritas"],
-                deadline=datetime.strptime(data["Deadline"], "%Y-%m-%d").date(),
-                selesai=data.get("Selesai", "False") == "True"
+                nama=data["Nama"].strip(),
+                deskripsi=data.get("Deskripsi", "").strip(),
+                prioritas=data["Prioritas"].strip(),
+                deadline=datetime.strptime(data["Deadline"].strip(), "%Y-%m-%d").date(),
+                selesai=selesai,
+                tanggal_selesai=tanggal_selesai
             )
             
-            # Handle completed tasks data
-            if task.selesai:
-                if data.get("Tanggal_Selesai"):
-                    task.tanggal_selesai = datetime.strptime(data["Tanggal_Selesai"], "%Y-%m-%d").date()
-                if data.get("Durasi_Aktual"):
-                    task.durasi_aktual = float(data["Durasi_Aktual"])
-                
-                # Validate completed task
-                if not task.tanggal_selesai or task.durasi_aktual is None:
-                    task.selesai = False  # Auto-correct invalid completed status
+            # Parse duration if available
+            if selesai and data.get("Durasi_Aktual", "").strip():
+                try:
+                    task.durasi_aktual = float(data["Durasi_Aktual"].strip())
+                except ValueError:
+                    task.durasi_aktual = task.durasi_estimasi
             
-            if data.get("Waktu_Rekomendasi"):
-                task.waktu_rekomendasi = datetime.strptime(data["Waktu_Rekomendasi"], "%Y-%m-%d %H:%M")
+            # Parse recommended time if available
+            if data.get("Waktu_Rekomendasi", "").strip():
+                try:
+                    task.waktu_rekomendasi = datetime.strptime(data["Waktu_Rekomendasi"].strip(), "%Y-%m-%d %H:%M")
+                except ValueError:
+                    pass  # Skip if invalid format
             
             return task
+            
         except (ValueError, KeyError) as e:
-            raise ValueError(f"Invalid task data: {str(e)}")
+            # Create minimal valid task if critical fields are missing
+            try:
+                return cls(
+                    nama=data.get("Nama", "Task Recovery").strip(),
+                    deskripsi=data.get("Deskripsi", "").strip(),
+                    prioritas=data.get("Prioritas", "Sedang").strip(),
+                    deadline=datetime.now().date(),
+                    selesai=False
+                )
+            except Exception:
+                raise ValueError(f"Invalid task data that couldn't be recovered: {str(e)}")
 
 
 class TaskManager:
@@ -109,14 +137,24 @@ class TaskManager:
         self._load_from_csv()
 
     def _load_from_csv(self) -> None:
-        """Load tasks from CSV file"""
-        if os.path.exists("tugas.csv"):
-            with open("tugas.csv", "r") as f:
-                reader = csv.DictReader(f)
-                self.tasks = [Task.from_dict(row) for row in reader]
+        """Load tasks from CSV file with error recovery"""
+        if not os.path.exists("tugas.csv"):
+            self.tasks = []
+            return
+            
+        self.tasks = []
+        with open("tugas.csv", "r", encoding='utf-8') as f:
+            reader = csv.DictReader(f)
+            for row in reader:
+                try:
+                    task = Task.from_dict(row)
+                    self.tasks.append(task)
+                except ValueError as e:
+                    print(f"Warning: Skipping invalid task - {e}")
+                    continue
 
     def save_to_csv(self):
-        """Save tasks to CSV file with proper error handling"""
+        """Save tasks to CSV file with data validation"""
         try:
             with open("tugas.csv", "w", newline="", encoding='utf-8') as f:
                 fieldnames = [
@@ -129,16 +167,18 @@ class TaskManager:
                 
                 for task in self.tasks:
                     try:
-                        # Pastikan data konsisten sebelum disimpan
-                        if task.selesai and (not task.tanggal_selesai or task.durasi_aktual is None):
-                            task.selesai = False  # Auto-correct invalid data
+                        # Ensure completed tasks have valid data
+                        if task.selesai:
+                            if not task.tanggal_selesai:
+                                task.selesai = False
+                            if task.durasi_aktual is None:
+                                task.durasi_aktual = task.durasi_estimasi
                         
                         writer.writerow(task.to_dict())
                     except Exception as e:
                         print(f"Error saving task {task.nama}: {e}")
                         continue
                         
-            print(f"Berhasil menyimpan {len(self.tasks)} tasks ke CSV")
             return True
         except Exception as e:
             print(f"Error saving to CSV: {e}")
