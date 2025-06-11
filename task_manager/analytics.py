@@ -50,10 +50,10 @@ def analyze_productivity_patterns(tasks: List[Task]) -> Dict:
 
 def predict_task_delay(task: Task, tasks: List[Task]) -> float:
     """Predict probability of task delay using machine learning"""
-    completed_tasks = [t for t in tasks if t.selesai and t.durasi_aktual]
+    completed_tasks = [t for t in tasks if t.selesai and t.durasi_aktual and t.tanggal_selesai]
     
-    if not completed_tasks:
-        return 0.0  # Default to no delay if no data
+    if len(completed_tasks) < 5:  # Minimum number of completed tasks needed
+        return 0.0  # Default to no delay if not enough data
         
     # Prepare features and target
     X = []
@@ -65,24 +65,28 @@ def predict_task_delay(task: Task, tasks: List[Task]) -> float:
         X.append([
             t.durasi_estimasi,
             t.durasi_aktual,
-            (t.deadline - t.tanggal_selesai).days if t.tanggal_selesai else 0,
+            days_to_deadline,
             t.prioritas == "Tinggi",
             t.prioritas == "Sedang"
         ])
         y.append(was_delayed)
     
-    # Train model
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-    model = RandomForestClassifier(n_estimators=100, random_state=42)
-    model.fit(X_train, y_train)
-    
-    # Predict for current task
-    task_features = [
-        task.durasi_estimasi,
-        task.durasi_estimasi,  # Using estimate since actual not available
-        (task.deadline - datetime.now().date()).days,
-        task.prioritas == "Tinggi",
-        task.prioritas == "Sedang"
-    ]
-    
-    return model.predict_proba([task_features])[0][1]  # Probability of delay
+    try:
+        # Train model
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
+        
+        # Predict for current task
+        task_features = [
+            task.durasi_estimasi,
+            task.durasi_estimasi,  # Using estimate since actual not available
+            (task.deadline - datetime.now().date()).days,
+            task.prioritas == "Tinggi",
+            task.prioritas == "Sedang"
+        ]
+        
+        proba = model.predict_proba([task_features])
+        return proba[0][1] if proba.shape[1] > 1 else 0.0  # Return probability of delay or 0 if model can't predict
+    except Exception:
+        return 0.0  # Return 0 if any error occurs
