@@ -2,7 +2,7 @@
 
 Aplikasi manajemen tugas berbasis web yang membantu mengorganisir, menganalisis, dan mengoptimalkan produktivitas pengguna dengan fitur-fitur cerdas.
 
-![App Screenshot](./images/rampilan_menu_utama.png)
+![App Screenshot](./images/tampilan_menu_utama.png)
 
 ## ✨ Fitur Utama
 
