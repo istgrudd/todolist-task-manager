@@ -59,7 +59,7 @@ class TimeOptimizer:
             avg_hour = np.mean([t.hour for t in completion_times])
             best_hour = min(17, max(9, int(avg_hour)))  # Normalize to work hours
         else:
-            best_hour = 10  # Default to 10 AM
+            best_hour = 10  
             
         # Find next available slot
         now = datetime.now()
@@ -79,5 +79,5 @@ class TimeOptimizer:
         priority_map = {"Tinggi": 1.0, "Sedang": 0.66, "Rendah": 0.33}
         similar_priorities = [priority_map.get(t.prioritas, 0.5) for t in similar_tasks]
         
-        # Weighted average considering task similarity
+        # Weighted average considering task similir
         return np.mean(similar_priorities)
