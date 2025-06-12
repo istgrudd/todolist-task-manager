@@ -59,7 +59,7 @@ class TimeOptimizer:
             avg_hour = np.mean([t.hour for t in completion_times])
             best_hour = min(17, max(9, int(avg_hour)))  # Normalize to work hours
         else:
-            best_hour = 10  
+            best_hour = 10  # Default to 10 AM
             
         # Find next available slot
         now = datetime.now()
