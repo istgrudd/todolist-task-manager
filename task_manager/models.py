@@ -13,8 +13,8 @@ from sklearn.metrics.pairwise import cosine_similarity
 class Task:
     """Class representing a single task with all its attributes"""
     PRIORITY_DURATIONS = {
-        "Tinggi": 2.0,
-        "Sedang": 4.0,
+        "Tinggi": 4.0,
+        "Sedang": 2.0,
         "Rendah": 1.0
     }
     
